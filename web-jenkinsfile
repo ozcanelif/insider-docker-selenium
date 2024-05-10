@@ -40,7 +40,7 @@ pipeline {
                           extensions                       : [],
                           gitTool                          : 'Default',
                           submoduleCfg                     : [],
-                          userRemoteConfigs                : [[url: 'https://github.com/ozcanelif/java-selenium-insider.git']]])
+                          userRemoteConfigs                : [[url: 'https://github.com/ozcanelif/insider-docker-selenium.git']]])
             }
         }
         stage('Running test') {
