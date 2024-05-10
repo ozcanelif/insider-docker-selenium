@@ -53,7 +53,7 @@ pipeline {
             steps {
                 script {
                     echo "PATH: \$(cat < $WORKSPACE)"
-                    def filePath = "$WORKSPACE/allure-results/9a23696b-5bcd-42fc-b727-35e579d1b755-result.json"
+                    def filePath = "$WORKSPACE/allure-results/1de34830-ab8f-494c-b58b-c732170f5341-result.json"
                     def fileContent = readFile(filePath)
                     def payload = [buildName      : FULL_BUILD_NAME,
                                    nodeCount      : NODE_COUNT,
