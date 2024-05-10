@@ -1,0 +1,81 @@
+pipeline {
+    agent any
+    parameters {
+        string(name: 'BUILD_NAME', defaultValue: 'Build_Name', description: 'Build name for this job')
+        choice(name: 'NODE_COUNT', choices: ['1', '2', '3', '4', '5'], description: 'Number of Selenium nodes (min=1, max=5)')
+        choice(name: 'headless', choices: ['true', 'false'], description: '')
+        string(name: 'tagName', defaultValue: '@smoke', description: '')
+        string(name: 'browser', defaultValue: 'remote-chrome', description: '')
+        string(name: 'remoteUrl', defaultValue: 'http://selenium-hub:4444/', description: '')
+        gitParameter branch: '',
+                branchFilter: 'origin/(.*)',
+                useRepository: '.*.git',
+                defaultValue: 'main',
+                description: 'Select your branch',
+                name: 'BRANCH',
+                quickFilterEnabled: true,
+                selectedValue: 'DEFAULT',
+                sortMode: 'DESCENDING_SMART',
+                tagFilter: '*',
+                type: 'PT_BRANCH'
+    }
+    environment {
+        BUILD_DESCRIPTION = "Jenkins Pipeline to run the test automation"
+        FULL_BUILD_NAME = "${params.BUILD_NAME}_${env.BUILD_NUMBER}"
+    }
+    stages {
+        stage('Initialize') {
+            steps {
+                script {
+                    currentBuild.displayName = env.FULL_BUILD_NAME
+                    currentBuild.description = env.BUILD_DESCRIPTION
+                }
+            }
+        }
+        stage('Checkout') {
+            steps {
+                checkout([$class                           : 'GitSCM',
+                          branches                         : [[name: "${params.BRANCH}"]],
+                          doGenerateSubmoduleConfigurations: false,
+                          extensions                       : [],
+                          gitTool                          : 'Default',
+                          submoduleCfg                     : [],
+                          userRemoteConfigs                : [[url: 'https://github.com/ozcanelif/java-selenium-insider.git']]])
+            }
+        }
+        stage('Running test') {
+            steps {
+                sh 'chmod +x run_test.sh'
+                sh "./run_test.sh ${params.browser} ${params.headless} ${params.tagName} ${params.remoteUrl} ${params.NODE_COUNT} ${WORKSPACE}"
+            }
+        }
+        stage('Send Test Results to Webhook') {
+            steps {
+                script {
+                    echo "PATH: \$(cat < $WORKSPACE)"
+                    def filePath = "$WORKSPACE/allure-results/9a23696b-5bcd-42fc-b727-35e579d1b755-result.json"
+                    def fileContent = readFile(filePath)
+                    def payload = [buildName      : FULL_BUILD_NAME,
+                                   nodeCount      : NODE_COUNT,
+                                   headless       : headless,
+                                   tagName        : tagName,
+                                   browser        : browser,
+                                   remoteUrl: remoteUrl,
+                                   fileContent : fileContent]
+                    def response = httpRequest(contentType: 'APPLICATION_JSON',
+                            httpMode: 'POST',
+                            requestBody: groovy.json.JsonOutput.toJson(payload),
+                            url: 'https://webhook.site/8ad3f3e9-b519-4e5c-9550-0e8e2650b478')
+                    if (response.status != 200) {
+                        error "Failed to send test results to webhook. Status: ${response.status}, Response: ${response.content}"
+                    }
+                }
+            }
+        }
+    }
+    post {
+        always {
+            allure includeProperties: false, jdk: '', results: [[path: 'allure-results']]
+        }
+    }
+}
